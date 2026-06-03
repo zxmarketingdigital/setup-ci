@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Como criar Setups do ZX Control — Guia do Colaborador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0a0a0a; --bg2:#111111; --card:#161616; --card2:#1c1c1c;
+    --border:#262626; --border2:#333;
+    --amber:#D97706; --amber-l:#F59E0B; --amber-glow:rgba(217,119,6,.15);
+    --text:#ededed; --muted:#a3a3a3; --dim:#737373;
+    --green:#22c55e; --red:#ef4444;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;
+       line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:0 24px}
+
+  /* hero */
+  header{padding:72px 0 48px;border-bottom:1px solid var(--border);
+         background:radial-gradient(900px 400px at 50% -10%,var(--amber-glow),transparent 70%)}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+         color:var(--amber-l);border:1px solid var(--border2);border-radius:999px;
+         padding:6px 14px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:24px}
+  .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);
+         box-shadow:0 0 8px var(--green)}
+  h1{font-size:40px;line-height:1.1;font-weight:800;letter-spacing:-.02em;margin-bottom:16px}
+  h1 span{color:var(--amber)}
+  .lead{font-size:18px;color:var(--muted);max-width:640px}
+  .pill{display:inline-block;margin-top:20px;background:var(--amber-glow);border:1px solid var(--amber);
+        color:var(--amber-l);font-weight:600;font-size:14px;padding:10px 18px;border-radius:10px}
+
+  /* sections */
+  section{padding:48px 0;border-bottom:1px solid var(--border)}
+  .kicker{font-family:var(--mono);font-size:12px;color:var(--amber);text-transform:uppercase;
+          letter-spacing:.08em;margin-bottom:10px}
+  h2{font-size:26px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+  .sub{color:var(--muted);margin-bottom:28px;font-size:15px}
+
+  /* steps */
+  .step{display:flex;gap:18px;padding:18px 0;border-top:1px solid var(--border)}
+  .step:first-of-type{border-top:none}
+  .num{flex:none;width:38px;height:38px;border-radius:50%;background:var(--card2);
+       border:1px solid var(--amber);color:var(--amber-l);font-weight:700;font-family:var(--mono);
+       display:flex;align-items:center;justify-content:center;font-size:15px}
+  .step .body{padding-top:5px}
+  .step .body strong{color:#fff;font-weight:600}
+  .who{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:6px;
+       margin-right:8px;vertical-align:middle}
+  .who.raf{background:rgba(217,119,6,.18);color:var(--amber-l);border:1px solid var(--amber)}
+  .who.col{background:rgba(34,197,94,.14);color:var(--green);border:1px solid rgba(34,197,94,.4)}
+
+  /* quote bubble (o que falar pro Claude) */
+  .say{background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--amber);
+       border-radius:10px;padding:14px 16px;margin-top:12px;font-size:15px;color:#e8e8e8}
+  .say::before{content:"💬 fale pro Claude:";display:block;font-family:var(--mono);font-size:11px;
+       color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  code{font-family:var(--mono);font-size:13px;background:#000;border:1px solid var(--border);
+       padding:2px 7px;border-radius:6px;color:var(--amber-l)}
+  pre{background:#000;border:1px solid var(--border);border-radius:10px;padding:14px 16px;
+      overflow:auto;margin-top:12px;font-family:var(--mono);font-size:13px;color:#d4d4d4}
+
+  /* cards row */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px}
+  .card h3{font-size:17px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .card p{color:var(--muted);font-size:14px}
+
+  /* faq */
+  details{background:var(--card);border:1px solid var(--border);border-radius:12px;
+          padding:0;margin-bottom:12px;overflow:hidden}
+  summary{cursor:pointer;padding:16px 20px;font-weight:600;font-size:15px;list-style:none;
+          display:flex;justify-content:space-between;align-items:center}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";color:var(--amber);font-size:22px;font-weight:400;line-height:1}
+  details[open] summary::after{content:"−"}
+  details .ans{padding:0 20px 18px;color:var(--muted);font-size:14.5px}
+
+  .note{background:var(--amber-glow);border:1px solid var(--amber);border-radius:12px;
+        padding:16px 20px;color:#f3d9b5;font-size:14.5px;margin-top:8px}
+  .note strong{color:var(--amber-l)}
+
+  footer{padding:40px 0 60px;text-align:center;color:var(--dim);font-size:13px}
+  footer a{color:var(--amber-l);text-decoration:none}
+  @media(max-width:640px){h1{font-size:30px}.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="badge">ZX Control · Guia do Colaborador</div>
+    <h1>Criar e atualizar <span>Setups do ZX Control</span> sem saber programar</h1>
+    <p class="lead">Você conversa com o Claude em português. Ele faz todo o trabalho técnico —
+       git, terminal, código. Você nunca digita comando e não consegue quebrar nada.</p>
+    <div class="pill">🔒 Tudo que você faz vira um “pedido de aprovação”. Nada vai pro ar sem o Rafael revisar.</div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">Configuração inicial</div>
+    <h2>Uma vez só</h2>
+    <p class="sub">Você faz isso na primeira vez e nunca mais.</p>
+    <div class="step"><div class="num">1</div><div class="body">Abra <code>claude.ai/code</code> no navegador.</div></div>
+    <div class="step"><div class="num">2</div><div class="body">Faça login com o usuário e a senha que o <strong>Rafael</strong> te passou.</div></div>
+    <div class="step"><div class="num">3</div><div class="body">Quando pedir, clique em <strong>conectar o GitHub</strong> e autorize. (É onde os setups ficam guardados.)</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">Fluxo principal</div>
+    <h2>Criar um Setup NOVO</h2>
+    <p class="sub">O Rafael prepara o repositório (30 segundos) e te manda o link. Você começa no passo 2.</p>
+    <div class="step"><div class="num">1</div><div class="body"><span class="who raf">Rafael</span>Cria o repositório a partir do molde e aplica as proteções. Te envia o link.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><span class="who col">Você</span>Abra o <code>claude.ai/code</code> e abra o repositório que o Rafael mandou.
+      <div class="say">Vamos criar o Setup N do ZX Control sobre <em>[tema que o Rafael passou]</em>. Leia o CLAUDE.md e me conduza.</div></div></div>
+    <div class="step"><div class="num">3</div><div class="body"><span class="who col">Você</span>Deixe o Claude trabalhar. Ele faz perguntas e monta tudo.</div></div>
+    <div class="step"><div class="num">4</div><div class="body"><span class="who col">Você</span>Peça pra validar:
+      <div class="say">valida o setup</div></div></div>
+    <div class="step"><div class="num">5</div><div class="body"><span class="who col">Você</span>Peça pra abrir o pedido de aprovação:
+      <div class="say">abre o Pull Request</div></div></div>
+    <div class="step"><div class="num">6</div><div class="body"><span class="who col">Você</span>Avise o Rafael que está pronto. Ele revisa, aprova e publica pros alunos.</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">Fluxo principal</div>
+    <h2>Atualizar um Setup que JÁ existe</h2>
+    <p class="sub">Mais simples ainda — não precisa criar nada.</p>
+    <div class="step"><div class="num">1</div><div class="body"><span class="who col">Você</span>No <code>claude.ai/code</code>, abra o repositório do setup que quer mexer.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><span class="who col">Você</span>Diga o que mudar:
+      <div class="say">Neste setup, corrige / adiciona <em>[o que for]</em>. Leia o CLAUDE.md antes.</div></div></div>
+    <div class="step"><div class="num">3</div><div class="body"><span class="who col">Você</span><code>valida o setup</code> → <code>abre o Pull Request</code> → avise o Rafael.</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">Como funciona por trás</div>
+    <h2>Você não precisa decorar regras</h2>
+    <div class="cards">
+      <div class="card"><h3>🤖 O Claude já sabe as regras</h3><p>As 12 regras do ZX Control vivem dentro do repositório. O Claude lê sozinho e segue.</p></div>
+      <div class="card"><h3>✅ A validação confere tudo</h3><p>Ao abrir o Pull Request, um “fiscal” automático checa as 12 regras. Se algo estiver errado, aparece vermelho.</p></div>
+      <div class="card"><h3>🔒 Nada vai pro ar sem aprovação</h3><p>Você só propõe. O Rafael é o único que aprova e publica. Impossível quebrar a produção.</p></div>
+      <div class="card"><h3>🙅 Você nunca usa o terminal</h3><p>Git, comandos, deploy — tudo é o Claude. Você só conversa em português.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">Perguntas comuns</div>
+    <h2>FAQ</h2>
+    <details><summary>Preciso digitar comandos no terminal?</summary><div class="ans">Não. Você só conversa com o Claude. Ele cuida do terminal, do git e de tudo.</div></details>
+    <details><summary>E se a validação reclamar de alguma coisa?</summary><div class="ans">Peça pro Claude corrigir: <em>“corrige os erros que a validação apontou”</em>. Ele resolve e valida de novo.</div></details>
+    <details><summary>Posso quebrar a produção ou os alunos?</summary><div class="ans">Não. Você só abre um pedido (Pull Request). Nada entra no ar até o Rafael aprovar.</div></details>
+    <details><summary>O que é um “Pull Request”?</summary><div class="ans">É um pedido de revisão: você propõe uma mudança e o Rafael decide se entra. Como mandar um documento pra aprovação.</div></details>
+    <details><summary>Travei e não sei o que fazer.</summary><div class="ans">Escreva pro Claude: <em>“estou perdido, me explica o próximo passo de forma simples”</em>. Se ainda travar, chame o Rafael.</div></details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    ZX LAB · Guia do Colaborador — Setups do ZX Control<br />
+    Documentação completa no repositório <a href="https://github.com/zxmarketingdigital/zx-control-setup-template">zx-control-setup-template</a>
+  </div>
+</footer>
+
+</body>
+</html>
