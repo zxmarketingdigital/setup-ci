@@ -33,7 +33,8 @@ GREP_CHECKS: List[Dict[str, Any]] = [
         "desc": "Type union `X | None` é Python 3.10+ — quebra em alunos com Python 3.9.",
         "pattern": r'\b\w+\s*\|\s*None\b',
         "include": ["*.py"],
-        "exclude_lines_with": ["# noqa", "from __future__ import"],
+        # Crase = prosa em docstring/markdown que cita a regra (não é código real).
+        "exclude_lines_with": ["# noqa", "from __future__ import", "`"],
         "severity": "block",
         "fix": "Use Optional[str] (from typing import Optional) ou adicione "
                "`from __future__ import annotations` no topo do arquivo.",
