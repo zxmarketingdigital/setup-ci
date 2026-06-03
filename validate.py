@@ -102,11 +102,13 @@ GREP_CHECKS: List[Dict[str, Any]] = [
     },
     {
         "id": "no_internal_infra_leak",
-        "desc": "Referência a infraestrutura interna do Rafael não pode ir pro repo público. "
-                "(OBS: ~/.operacao-ia/config/ é o diretório LOCAL do aluno — permitido.)",
-        "pattern": r'(zxlab-mission-control|hjcudhxizemxepffrmbw|'
-                   r'pnfvlszwlumetdjsuktj|webhook\.integracoes|'
-                   r'\bsetup_io\b|\bversoes_io\b|paleta-cores-setups)',
+        "desc": "IDs/infra interna do Rafael não podem ir pro repo público. "
+                "(OBS: ~/.operacao-ia/config/ e ~/.zxlab-mission-control/ são pastas "
+                "do PRÓPRIO ALUNO no produto — permitidas. O que NÃO pode é ID de "
+                "Supabase interno, webhook de produção ou helpers do pipeline.)",
+        "pattern": r'(hjcudhxizemxepffrmbw|pnfvlszwlumetdjsuktj|'
+                   r'webhook\.integracoes|\bsetup_io\b|\bversoes_io\b|'
+                   r'paleta-cores-setups)',
         "include": ["*.py", "*.ts", "*.js", "*.md", "*.json", "*.html"],
         "exclude_lines_with": ["validate.py", "no_internal_infra_leak"],
         "severity": "block",
