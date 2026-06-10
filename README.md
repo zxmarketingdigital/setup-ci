@@ -45,6 +45,34 @@ jobs:
 
 Pronto. Todo PR roda os 11 checks e fica vermelho se algo violar uma regra.
 
+## Perfil nicho-dod (opt-in)
+
+Para repos de **produto de nicho** (Clínica Cheia, Corretor ZX Control, etc.) existe um
+perfil extra com regras de **DoD (Definition of Done)** das entregas comerciais.
+
+**Como ativar:** crie `.setup-ci.json` na raiz do repo do produto:
+
+```json
+{"perfil": "nicho-dod"}
+```
+
+> **Repos sem o arquivo não são afetados** — o comportamento segue 100% idêntico ao
+> validador original. Os setups existentes que usam `@v1` continuam passando como antes.
+
+Regras adicionais (todas bloqueiam):
+
+| # | Regra |
+|---|-------|
+| N1 | `docs/apresentacao.html` existe, com link `github.com/zxmarketingdigital/` e instrução de colar no Claude na seção de instalação |
+| N2 | `docs/proposta.html` existe e contém `R$` (precificação preenchida) |
+| N3 | `demo/server.mjs` e `demo/data.mjs` existem e passam `node --check` |
+| N4 | `painel/style.css` contém os tokens do design system ZX: `#0D0D0D`, `#D97706` e `JetBrains Mono` |
+| N5 | `painel/index.html` tem pelo menos 2 botões de cadastro (`+ Novo`, `+ Agendar`, `+ Adicionar`, `+ Cadastrar`) |
+| N6 | Nenhum placeholder `{{` em `.html/.md/.mjs/.js` dentro de `docs/`, `painel/` e `demo/` (template não renderizado) |
+
+`.setup-ci.json` inválido (JSON quebrado) também bloqueia, com mensagem clara — pra
+não falhar silencioso achando que o perfil está ativo.
+
 ## Rodar localmente (antes de abrir o PR)
 
 ```bash
@@ -52,6 +80,12 @@ python3 validate.py --path .
 ```
 
 Não tem dependências — só Python 3.9+ da biblioteca padrão.
+
+Smoke test do validador (dois modos, com e sem perfil):
+
+```bash
+python3 tests/smoke_nicho_dod.py
+```
 
 ---
 _Mantido por ZX LAB. Para mudar uma regra, edite `validate.py` e suba a tag `v1`._

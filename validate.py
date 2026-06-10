@@ -19,11 +19,13 @@ Compatível com Python 3.9+ (o próprio código respeita a regra que valida).
 """
 import argparse
 import ast
+import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # --- As 12 regras, em forma de checks mecânicos ----------------------------
 # Cada check é genérico: não referencia nenhum ID/credencial/caminho interno.
@@ -119,6 +121,204 @@ GREP_CHECKS: List[Dict[str, Any]] = [
 
 REQUIRED_FILES = ["README.md", "CLAUDE.md", "MASTERCLASS.md", "setup/check_prerequisites.py"]
 
+# --- Perfil opt-in "nicho-dod" (DoD de produto de nicho) -------------------
+# Ativado SOMENTE quando existir `.setup-ci.json` na raiz do repo validado
+# com {"perfil": "nicho-dod"}. Sem esse arquivo/perfil, o comportamento é
+# 100% idêntico ao validador original — repos existentes não são afetados.
+
+PROFILE_FILE = ".setup-ci.json"
+NICHO_DOD_PROFILE = "nicho-dod"
+
+
+def load_profile(root: Path) -> Optional[str]:
+    """Lê .setup-ci.json na raiz do repo validado e retorna o perfil (ou None)."""
+    pf = root / PROFILE_FILE
+    if not pf.exists():
+        return None
+    try:
+        data = json.loads(pf.read_text(encoding="utf-8"))
+    except Exception:
+        return "__invalid__"
+    if not isinstance(data, dict):
+        return "__invalid__"
+    perfil = data.get("perfil")
+    return perfil if isinstance(perfil, str) else None
+
+
+def _nicho_fail(check: str, file: str, snippet: str, fix: str,
+                line: int = 0, severity: str = "block") -> Dict[str, Any]:
+    return {"file": file, "line": line, "check": check,
+            "severity": severity, "snippet": snippet, "fix": fix}
+
+
+def check_n1_apresentacao(root: Path) -> List[Dict[str, Any]]:
+    """N1: docs/apresentacao.html existe, com link do repo e instrução Claude."""
+    rel = "docs/apresentacao.html"
+    f = root / rel
+    if not f.exists():
+        return [_nicho_fail("N1", rel, "arquivo ausente",
+                            "Crie docs/apresentacao.html — a página de apresentação "
+                            "do produto de nicho é entrega obrigatória do DoD.")]
+    fails = []
+    try:
+        content = f.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return [_nicho_fail("N1", rel, "arquivo ilegível (encoding)",
+                            "Salve docs/apresentacao.html em UTF-8.")]
+    if "github.com/zxmarketingdigital/" not in content:
+        fails.append(_nicho_fail(
+            "N1", rel, "sem link github.com/zxmarketingdigital/",
+            "Adicione o link público do repositório "
+            "(github.com/zxmarketingdigital/<repo>) na seção de instalação."))
+    if "claude" not in content.lower():
+        fails.append(_nicho_fail(
+            "N1", rel, "sem menção a 'claude' na página",
+            "A seção de instalação precisa da instrução de colar o comando "
+            "no Claude (ex.: 'cole no Claude Code')."))
+    return fails
+
+
+def check_n2_proposta(root: Path) -> List[Dict[str, Any]]:
+    """N2: docs/proposta.html existe e contém R$ (precificação preenchida)."""
+    rel = "docs/proposta.html"
+    f = root / rel
+    if not f.exists():
+        return [_nicho_fail("N2", rel, "arquivo ausente",
+                            "Crie docs/proposta.html — a proposta comercial "
+                            "do produto de nicho é entrega obrigatória do DoD.")]
+    try:
+        content = f.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return [_nicho_fail("N2", rel, "arquivo ilegível (encoding)",
+                            "Salve docs/proposta.html em UTF-8.")]
+    if "R$" not in content:
+        return [_nicho_fail("N2", rel, "sem 'R$' no arquivo",
+                            "Preencha a precificação da proposta (valores em R$) — "
+                            "proposta sem preço não está pronta pra entregar ao cliente.")]
+    return []
+
+
+def check_n3_demo_node(root: Path) -> List[Dict[str, Any]]:
+    """N3: demo/server.mjs e demo/data.mjs existem e passam `node --check`."""
+    fails = []
+    targets = ["demo/server.mjs", "demo/data.mjs"]
+    missing = [t for t in targets if not (root / t).exists()]
+    for rel in missing:
+        fails.append(_nicho_fail("N3", rel, "arquivo ausente",
+                                 "Crie {} — o demo navegável faz parte do DoD "
+                                 "do produto de nicho.".format(rel)))
+    to_check = [t for t in targets if t not in missing]
+    if not to_check:
+        return fails
+    node = shutil.which("node")
+    if node is None:
+        fails.append(_nicho_fail(
+            "N3", "demo/", "node não encontrado no PATH — sintaxe não verificada",
+            "Instale Node.js para validar a sintaxe de demo/*.mjs "
+            "(no CI o Node já vem instalado).", severity="warn"))
+        return fails
+    for rel in to_check:
+        try:
+            proc = subprocess.run([node, "--check", str(root / rel)],
+                                  capture_output=True, text=True, timeout=30)
+        except Exception as e:
+            fails.append(_nicho_fail("N3", rel, "node --check falhou: {}".format(e),
+                                     "Rode `node --check {}` localmente e corrija.".format(rel)))
+            continue
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "").strip().splitlines()
+            fails.append(_nicho_fail(
+                "N3", rel, (err[0][:160] if err else "erro de sintaxe"),
+                "Corrija o erro de sintaxe — `node --check {}` precisa passar.".format(rel)))
+    return fails
+
+
+def check_n4_painel_tokens(root: Path) -> List[Dict[str, Any]]:
+    """N4: painel/style.css existe com os 3 tokens do design system ZX."""
+    rel = "painel/style.css"
+    f = root / rel
+    if not f.exists():
+        return [_nicho_fail("N4", rel, "arquivo ausente",
+                            "Crie painel/style.css com o design system ZX "
+                            "(#0D0D0D, #D97706, JetBrains Mono).")]
+    try:
+        content = f.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return [_nicho_fail("N4", rel, "arquivo ilegível (encoding)",
+                            "Salve painel/style.css em UTF-8.")]
+    lower = content.lower()
+    fails = []
+    if "#0d0d0d" not in lower:
+        fails.append(_nicho_fail("N4", rel, "token #0D0D0D ausente",
+                                 "Use o fundo near-black #0D0D0D do design system ZX."))
+    if "#d97706" not in lower:
+        fails.append(_nicho_fail("N4", rel, "token #D97706 ausente",
+                                 "Use o acento âmbar #D97706 do design system ZX."))
+    if "JetBrains Mono" not in content:
+        fails.append(_nicho_fail("N4", rel, "fonte JetBrains Mono ausente",
+                                 "Use a fonte JetBrains Mono pra números/código "
+                                 "conforme o design system ZX."))
+    return fails
+
+
+def check_n5_painel_botoes(root: Path) -> List[Dict[str, Any]]:
+    """N5: painel/index.html tem pelo menos 2 botões de cadastro (+ Novo/Agendar/...)."""
+    rel = "painel/index.html"
+    f = root / rel
+    if not f.exists():
+        return [_nicho_fail("N5", rel, "arquivo ausente",
+                            "Crie painel/index.html — o painel operacional faz "
+                            "parte do DoD do produto de nicho.")]
+    try:
+        content = f.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return [_nicho_fail("N5", rel, "arquivo ilegível (encoding)",
+                            "Salve painel/index.html em UTF-8.")]
+    hits = re.findall(r'\+\s*(Nov[oa]|Agendar|Adicionar|Cadastrar)', content,
+                      flags=re.IGNORECASE)
+    if len(hits) < 2:
+        return [_nicho_fail(
+            "N5", rel,
+            "{} botão(ões) de cadastro encontrado(s) (mínimo 2)".format(len(hits)),
+            "O painel precisa de pelo menos 2 botões de cadastro/ação "
+            "(ex.: '+ Novo', '+ Agendar', '+ Adicionar', '+ Cadastrar').")]
+    return []
+
+
+def check_n6_sem_placeholders(root: Path) -> List[Dict[str, Any]]:
+    """N6: nenhum placeholder `{{` em .html/.md/.mjs/.js de docs/, painel/ e demo/."""
+    fails = []
+    for sub in ["docs", "painel", "demo"]:
+        base = root / sub
+        if not base.exists():
+            continue
+        for f in _iter_files(base, ["*.html", "*.md", "*.mjs", "*.js"]):
+            try:
+                lines = f.read_text(encoding="utf-8", errors="ignore").splitlines()
+            except Exception:
+                continue
+            for i, line in enumerate(lines, 1):
+                if "{{" in line:
+                    fails.append(_nicho_fail(
+                        "N6", str(f.relative_to(root)),
+                        line.strip()[:160],
+                        "Placeholder `{{` não preenchido — substitua pelo valor "
+                        "real antes de entregar (template não renderizado).",
+                        line=i))
+    return fails
+
+
+def collect_nicho_dod_failures(root: Path) -> List[Dict[str, Any]]:
+    """Roda as regras N1..N6 do perfil nicho-dod."""
+    failures: List[Dict[str, Any]] = []
+    failures += check_n1_apresentacao(root)
+    failures += check_n2_proposta(root)
+    failures += check_n3_demo_node(root)
+    failures += check_n4_painel_tokens(root)
+    failures += check_n5_painel_botoes(root)
+    failures += check_n6_sem_placeholders(root)
+    return failures
+
 
 def _iter_files(base: Path, patterns: List[str]):
     for pat in patterns:
@@ -211,6 +411,19 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
                             "snippet": line.strip()[:160],
                             "fix": chk.get("fix", ""),
                         })
+
+    # 5) perfil opt-in nicho-dod (regras N1..N6) — só roda se .setup-ci.json
+    #    declarar {"perfil": "nicho-dod"}. Sem o arquivo, nada muda.
+    perfil = load_profile(root)
+    if perfil == "__invalid__":
+        failures.append(_nicho_fail(
+            "setup_ci_json_invalido", PROFILE_FILE,
+            "JSON inválido ou formato inesperado",
+            'O arquivo .setup-ci.json precisa ser um JSON tipo '
+            '{"perfil": "nicho-dod"}. Corrija ou remova o arquivo.'))
+    elif perfil == NICHO_DOD_PROFILE:
+        failures += collect_nicho_dod_failures(root)
+
     return failures
 
 
