@@ -333,8 +333,27 @@ def _iter_files(base: Path, patterns: List[str]):
             yield f
 
 
+def _git_ignored(root: Path, relpath: str) -> bool:
+    """True se o arquivo é gitignored (logo nunca existe no checkout do CI)."""
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-q", relpath],
+            capture_output=True, timeout=10,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+# Arquivos exigidos só em setup de ENSINO (zx-control-setupN); produto de
+# nicho (perfil nicho-dod) não tem masterclass embutida nem check_prerequisites.
+ENSINO_ONLY_REQUIRED = {"MASTERCLASS.md", "setup/check_prerequisites.py"}
+
+
 def collect_failures(root: Path) -> List[Dict[str, Any]]:
     failures: List[Dict[str, Any]] = []
+    perfil = load_profile(root)
+    nicho = perfil == NICHO_DOD_PROFILE
 
     # 1) AST 3.9 em todos os .py
     for py in _iter_files(root, ["*.py"]):
@@ -354,8 +373,10 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
                 "fix": "Sintaxe incompatível com Python 3.9.",
             })
 
-    # 2) estrutura mínima
+    # 2) estrutura mínima (perfil nicho-dod dispensa os arquivos de ensino)
     for req in REQUIRED_FILES:
+        if nicho and req in ENSINO_ONLY_REQUIRED:
+            continue
         if not (root / req).exists():
             failures.append({
                 "file": req, "line": 0, "check": "estrutura_minima",
@@ -412,9 +433,19 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
                             "fix": chk.get("fix", ""),
                         })
 
+    # 4b) perfil nicho-dod: fixtures de teste e arquivos gitignored não são
+    #     vazamento real de segredo (gitignored nem existe no checkout do CI).
+    if nicho:
+        failures = [
+            f for f in failures
+            if not (
+                f["check"] == "no_hardcoded_secrets"
+                and (f["file"].startswith("tests/") or _git_ignored(root, f["file"]))
+            )
+        ]
+
     # 5) perfil opt-in nicho-dod (regras N1..N6) — só roda se .setup-ci.json
     #    declarar {"perfil": "nicho-dod"}. Sem o arquivo, nada muda.
-    perfil = load_profile(root)
     if perfil == "__invalid__":
         failures.append(_nicho_fail(
             "setup_ci_json_invalido", PROFILE_FILE,
