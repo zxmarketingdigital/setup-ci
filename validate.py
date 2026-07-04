@@ -2,7 +2,7 @@
 """
 validate.py — Validador de Setup ZX Control (standalone, sem dependências externas).
 
-Porta as 12 regras invioláveis (AST Python 3.9 + greps mecânicos) que o pipeline
+Porta as 11 regras invioláveis (AST Python 3.9 + greps mecânicos) que o pipeline
 interno do Rafael roda no sandbox E2E, mas de forma 100% offline sobre o working
 tree local — sem clone, sem credenciais, sem acesso à máquina do Rafael.
 
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-# --- As 12 regras, em forma de checks mecânicos ----------------------------
+# --- As 11 regras, em forma de checks mecânicos ----------------------------
 # Cada check é genérico: não referencia nenhum ID/credencial/caminho interno.
 GREP_CHECKS: List[Dict[str, Any]] = [
     {

@@ -1,7 +1,7 @@
 # setup-ci — Validador central dos Setups ZX Control
 
 GitHub Action reutilizável que valida qualquer repo de **Setup do ZX Control** contra as
-**12 regras invioláveis** — sem precisar da máquina do Rafael, sem credenciais, sem segredos.
+**11 regras invioláveis** — sem precisar da máquina do Rafael, sem credenciais, sem segredos.
 
 É a **fonte única de verdade** das regras: quando uma regra muda, muda aqui (uma vez), e
 todos os repos de setup que usam `@v1` herdam automaticamente no próximo Pull Request.

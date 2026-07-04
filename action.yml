@@ -1,5 +1,5 @@
 name: "ZX Control Setup CI"
-description: "Valida um repo de Setup ZX Control contra as 12 regras invioláveis (AST Python 3.9 + greps mecânicos + estrutura mínima)."
+description: "Valida um repo de Setup ZX Control contra as 11 regras invioláveis (AST Python 3.9 + greps mecânicos + estrutura mínima)."
 branding:
   icon: "check-circle"
   color: "orange"
@@ -17,7 +17,7 @@ runs:
       with:
         python-version: "3.9"
 
-    - name: Rodar validador das 12 regras
+    - name: Rodar validador das 11 regras
       shell: bash
       run: |
         python3 "${GITHUB_ACTION_PATH}/validate.py" --path "${GITHUB_WORKSPACE}"
