@@ -105,12 +105,33 @@ GREP_CHECKS: List[Dict[str, Any]] = [
     {
         "id": "no_internal_infra_leak",
         "desc": "IDs/infra interna do Rafael não podem ir pro repo público. "
-                "(OBS: ~/.operacao-ia/config/ e ~/.zxlab-mission-control/ são pastas "
-                "do PRÓPRIO ALUNO no produto — permitidas. O que NÃO pode é ID de "
-                "Supabase interno, webhook de produção ou helpers do pipeline.)",
+                "(OBS: ~/.operacao-ia/, ~/.zxlab-mission-control/, ~/.zxlab-backup/ "
+                "e ~/.codex/automations/ são pastas do PRÓPRIO ALUNO no produto — "
+                "permitidas. Idem `~/projetos/<slug>` e `wrangler pages deploy`, que "
+                "o aluno também usa. O que NÃO pode é ID de Supabase interno, webhook "
+                "de produção, helper do pipeline, daemon/porta que só existe na "
+                "máquina do Rafael, skill que só ele tem, ou slug da memória dele.)",
+        # Só marcadores INEQUÍVOCOS: cada um não tem equivalente do lado do aluno.
         "pattern": r'(hjcudhxizemxepffrmbw|pnfvlszwlumetdjsuktj|'
                    r'webhook\.integracoes|\bsetup_io\b|\bversoes_io\b|'
-                   r'paleta-cores-setups)',
+                   r'paleta-cores-setups|'
+                   # daemons/pastas que só existem na máquina do Rafael
+                   # (NÃO inclui .zxlab-mission-control/.zxlab-backup: são do aluno)
+                   r'~/\.zxlab-sites|~/\.openclaw|~/\.zapi-whatsapp|'
+                   r'~/\.scaleup-bunny|~/\.(?:hotmart|greenn|asaas|paypal)-connector|'
+                   # portas do Launcher (8891) e da Mission Control API (8790).
+                   # 8765 fica de fora: é o OmniRoute do próprio aluno.
+                   r'localhost:(?:8891|8790)|'
+                   # slugs da memória interna — o aluno não tem essa base
+                   r'\b(?:feedback|reference|project)_[a-z0-9]+(?:_[a-z0-9]+){2,}\b|'
+                   # alvo de publicação das áreas de membros
+                   r'--project-name\s+zx|MasterClass ZX Control|'
+                   # skills que só o Rafael tem instaladas (referência morta pro aluno)
+                   r'\b(?:upload-aulas-hub|upload-aulas-zxcontrol|add-setup-area-membros|'
+                   r'criar-setup-zxcontrol|cadastro-aluno-hub|liberar-acesso-zxcontrol|'
+                   r'bloquear-aluno-hub|crm-deploy|pages-deploy|deploy-edge-function|'
+                   r'migrar-scaleup-bunny|youtube-cortes-masterclass|criar-lp-zxcontrol)\b'
+                   r')',
         "include": ["*.py", "*.ts", "*.js", "*.md", "*.json", "*.html"],
         "exclude_lines_with": ["validate.py", "no_internal_infra_leak"],
         "severity": "block",
@@ -320,7 +341,39 @@ def collect_nicho_dod_failures(root: Path) -> List[Dict[str, Any]]:
     return failures
 
 
+_IGNORED_CACHE: Dict[str, set] = {}
+
+
+def _ignored_set(base: Path) -> set:
+    """Caminhos absolutos que o git ignora sob `base`, resolvidos de uma vez só.
+
+    O CI valida um checkout LIMPO: arquivo gitignored simplesmente não existe lá.
+    Varrer esses arquivos no working tree local gera falso positivo (ex.: saída
+    de build, cache, `graphify-out/`) — e um falso positivo recorrente é o que
+    faz alguém parar de confiar no validador.
+    """
+    key = str(base)
+    if key in _IGNORED_CACHE:
+        return _IGNORED_CACHE[key]
+    ignored: set = set()
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(base), "ls-files", "--others", "--ignored",
+             "--exclude-standard", "-z"],
+            capture_output=True, timeout=30,
+        )
+        if r.returncode == 0:
+            for rel in r.stdout.decode("utf-8", "ignore").split("\0"):
+                if rel:
+                    ignored.add(str((base / rel).resolve()))
+    except Exception:
+        pass  # sem git (ou repo estranho) → não filtra nada, comportamento antigo
+    _IGNORED_CACHE[key] = ignored
+    return ignored
+
+
 def _iter_files(base: Path, patterns: List[str]):
+    ignored = _ignored_set(base)
     for pat in patterns:
         for f in base.rglob(pat):
             # nunca varrer .git, node_modules, nem o próprio validador
@@ -329,6 +382,8 @@ def _iter_files(base: Path, patterns: List[str]):
             if ".git" in parts or "node_modules" in parts:
                 continue
             if f.name == "validate.py":
+                continue
+            if ignored and str(f.resolve()) in ignored:
                 continue
             yield f
 
