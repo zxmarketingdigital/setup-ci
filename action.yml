@@ -12,10 +12,10 @@ runs:
       with:
         fetch-depth: 0  # histórico completo p/ checar .env nunca commitado
 
-    - name: Setup Python 3.9 (mesma versão do aluno)
+    - name: Setup Python 3.10 (o mais antigo no Ubuntu 26.04; sintaxe 3.9 validada no AST)
       uses: actions/setup-python@v5
       with:
-        python-version: "3.9"
+        python-version: "3.10"
 
     - name: Rodar validador das 12 regras
       shell: bash
