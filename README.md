@@ -73,6 +73,20 @@ Regras adicionais (todas bloqueiam):
 `.setup-ci.json` inválido (JSON quebrado) também bloqueia, com mensagem clara — pra
 não falhar silencioso achando que o perfil está ativo.
 
+## Site publicado em `docs/` (opt-in)
+
+Quando a pasta é um site publicado de propósito (área de membros, painel com login), e
+não um dashboard aberto via `file://`, declare no `.setup-ci.json`:
+
+```json
+{"site_publico": ["docs"]}
+```
+
+Só dentro dessas pastas: `fetch()` passa a ser permitido e o project ref do Supabase deixa
+de contar como vazamento. Todo o resto continua bloqueando (outros marcadores de infra
+interna, segredo em código). Raiz, caminho absoluto, `..` ou valor malformado não relaxam
+nada. **Repos sem a chave não são afetados.**
+
 ## Rodar localmente (antes de abrir o PR)
 
 ```bash
@@ -85,6 +99,7 @@ Smoke test do validador (dois modos, com e sem perfil):
 
 ```bash
 python3 tests/smoke_nicho_dod.py
+python3 tests/smoke_site_publico.py
 ```
 
 ---

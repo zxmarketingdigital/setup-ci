@@ -33,10 +33,12 @@ GREP_CHECKS: List[Dict[str, Any]] = [
     {
         "id": "no_str_pipe_none",
         "desc": "Type union `X | None` é Python 3.10+ — quebra em alunos com Python 3.9.",
-        "pattern": r'\b\w+\s*\|\s*None\b',
+        "pattern": r'(?:\b\w+|[\]\)])\s*\|\s*None\b',
         "include": ["*.py"],
-        # Crase = prosa em docstring/markdown que cita a regra (não é código real).
-        "exclude_lines_with": ["# noqa", "from __future__ import", "`"],
+        # Comentário e crase dentro de trecho citado são prosa, não código.
+        "exclude_lines_with": ["# noqa", "from __future__ import"],
+        "skip_comment_lines": True,
+        "strip_inline_code": True,
         "severity": "block",
         "fix": "Use Optional[str] (from typing import Optional) ou adicione "
                "`from __future__ import annotations` no topo do arquivo.",
@@ -44,7 +46,7 @@ GREP_CHECKS: List[Dict[str, Any]] = [
     {
         "id": "no_match_case_python_310",
         "desc": "match/case é Python 3.10+ — quebra em macOS Monterey (3.9).",
-        "pattern": r'^\s*match\s+\w+\s*:',
+        "pattern": r'^\s*match\b[^=:#]+:\s*(?:#.*)?$',
         "include": ["*.py"],
         "exclude_lines_with": ["from __future__ import", "# noqa"],
         "severity": "block",
@@ -53,10 +55,10 @@ GREP_CHECKS: List[Dict[str, Any]] = [
     {
         "id": "no_fetch_in_docs",
         "desc": "Dashboard aberto via file:// bloqueia fetch() por CORS — abre tela branca.",
-        "pattern": r'\bfetch\s*\(',
+        "pattern": r'\bfetch\s*\(\s*(?:[^\s)]|$)',
         "paths": ["docs"],
-        "include": ["*.html", "*.js"],
-        "exclude_lines_with": ["//", "/*", "*"],
+        "include": ["*.html", "*.js", "*.mjs", "*.cjs", "*.jsx", "*.ts", "*.tsx"],
+        "ignora_se_antes_do_match": r'(?<!:)//|/\*(?!.*\*/)|<!--(?!.*-->)|^\s*\*(?:\s|$)',
         "severity": "block",
         "fix": "Injete os dados inline como `const _DATA = {...}` no HTML em tempo de build.",
     },
@@ -65,14 +67,12 @@ GREP_CHECKS: List[Dict[str, Any]] = [
         "desc": "Secret hardcoded no código.",
         # Exige um VALOR real (8+ chars sem espaço/aspas) entre aspas — evita casar
         # substrings tipo `"access_token="` ou valores vazios.
-        "pattern": r'(password|api_key|apikey|secret|token|service_role)'
-                   r'\s*[:=]\s*["\'][^"\'\s]{8,}["\']',
-        "include": ["*.py", "*.ts", "*.js"],
+        "pattern": r'(password|passwd|pwd|senha|credential|api_key|apikey|secret|token(?!_key)|service_role|service_key|private_key|access_key|master_key)\w*["\']?'
+                   r'\s*(?::\s*[\w\[\], ]+?\s*=|[:=])\s*["\'][^"\'\s]{8,}["\']',
+        "include": ["*.py", "*.ts", "*.js", "*.mjs", "*.cjs", "*.jsx", "*.tsx", "*.html",
+                    "*.sh", "*.yml", "*.yaml", "*.json", "*.md", "*.txt", "*.toml", "*.ini", "*.cfg",
+                    "*.ipynb", "*.ps1", "*.bat", "*.sql", "*.conf", "*.xml", "*.tf"],
         "case_insensitive": True,
-        "exclude_lines_with": ["os.environ", "Deno.env", "process.env", "${",
-                               "getenv", "config(", "#", "//", "*", "example",
-                               "EXAMPLE", "Example", "your_", "<", "placeholder",
-                               "os.getenv", "YOUR_", "xxx", "XXX", "..."],
         "severity": "block",
         "fix": "Mova para .env (gitignored). Python: os.environ.get('VAR'). "
                "Edge Function: Deno.env.get('VAR').",
@@ -97,7 +97,7 @@ GREP_CHECKS: List[Dict[str, Any]] = [
     {
         "id": "install_sh_no_rm_rf_target",
         "desc": "install.sh com `rm -rf $DIR` apaga dados do aluno em re-execução.",
-        "pattern": r'rm\s+-rf\s+["\']?\$\{?[A-Z_]*(DST|TARGET|INSTALL|DIR)',
+        "pattern": r'rm(?=(?:\s+-\S+)*?\s+(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\s)(?:\s+-\S+)*\s+["\']?\$\{?[A-Z_]*(DST|DEST|TARGET|INSTALL|DIR|PASTA|ROOT|BASE|HOME)',
         "include": ["install.sh", "*install.sh"],
         "severity": "block",
         "fix": "Use backup com timestamp: mv $DIR $DIR.bak-$(date +%s).",
@@ -111,8 +111,9 @@ GREP_CHECKS: List[Dict[str, Any]] = [
         "pattern": r'(hjcudhxizemxepffrmbw|pnfvlszwlumetdjsuktj|'
                    r'webhook\.integracoes|\bsetup_io\b|\bversoes_io\b|'
                    r'paleta-cores-setups)',
-        "include": ["*.py", "*.ts", "*.js", "*.md", "*.json", "*.html"],
-        "exclude_lines_with": ["validate.py", "no_internal_infra_leak"],
+        "include": ["*.py", "*.ts", "*.js", "*.mjs", "*.cjs", "*.jsx", "*.tsx", "*.md", "*.json",
+                    "*.html", "*.sh", "*.yml", "*.yaml", "*.txt", "*.toml", "*.ini", "*.cfg",
+                    "*.ipynb", "*.ps1", "*.bat", "*.sql", "*.conf", "*.xml", "*.tf"],
         "severity": "block",
         "fix": "Remova qualquer caminho/ID interno. O repo é PÚBLICO — isso vaza o "
                "mapa de produção do Rafael.",
@@ -128,6 +129,28 @@ REQUIRED_FILES = ["README.md", "CLAUDE.md", "MASTERCLASS.md", "setup/check_prere
 
 PROFILE_FILE = ".setup-ci.json"
 NICHO_DOD_PROFILE = "nicho-dod"
+
+# Opt-in {"site_publico": ["docs"]}: a pasta é um site publicado de propósito,
+# não um dashboard aberto via file://. Só duas coisas mudam dentro dela:
+#   - fetch() é permitido (no site publicado não há o bloqueio de CORS do file://);
+#   - o project ref do Supabase é permitido, porque o front publicado precisa dele.
+# Qualquer outro marcador de infra interna e o no_hardcoded_secrets seguem valendo.
+# Sem a chave, nada muda.
+SUPABASE_REF_RE = re.compile(r"hjcudhxizemxepffrmbw|pnfvlszwlumetdjsuktj")
+
+# Comentario real: o marcador abre a linha. Trecho com // ou # depois de codigo nao conta,
+# e /* x */ seguido de codigo tambem nao. # so e comentario em Python.
+CRASE_RE = re.compile(r"`[^`]*`")
+COMENTARIO_PY_RE = re.compile(r"\s*#")
+COMENTARIO_JS_RE = re.compile(r"\s*(?://|/\*(?!.*\*/)|\*(?:\s|$))")
+EXTENSOES_JS = {".js", ".ts", ".mjs", ".cjs", ".jsx", ".tsx"}
+STRING_RE = re.compile(r"""(["'`])(?:\\.|(?!\1).)*\1""")
+# Valor de exemplo no no_hardcoded_secrets: o VALOR inteiro tem de ser placeholder.
+SEGREDO_VALOR_RE = re.compile(r"""["']([^"']*)["']$""")
+SEGREDO_EXEMPLO_RE = re.compile(
+    r"\$\{.*\}|<[^>]*>|[a-z_-]*(?:\.{3}|[xX]{3,})|your[_-][a-z_-]*|[a-z_-]*example[a-z_-]*|[a-z_-]*placeholder[a-z_-]*|(?:0123456789abcdef)+|(?-i:[A-Z0-9_]*_(?:PASSWORD|PASSWD|PWD|SENHA|TOKEN|SECRET|KEY))",
+    re.IGNORECASE,
+)
 
 
 def load_profile(root: Path) -> Optional[str]:
@@ -325,10 +348,10 @@ def _iter_files(base: Path, patterns: List[str]):
         for f in base.rglob(pat):
             # nunca varrer .git, node_modules, nem o próprio validador
             # (ele contém os padrões que detecta — se auto-escanear, dá falso positivo)
-            parts = set(f.parts)
+            parts = set(f.relative_to(base).parts)
             if ".git" in parts or "node_modules" in parts:
                 continue
-            if f.name == "validate.py":
+            if f.resolve() == Path(__file__).resolve():
                 continue
             yield f
 
@@ -336,6 +359,11 @@ def _iter_files(base: Path, patterns: List[str]):
 def _git_ignored(root: Path, relpath: str) -> bool:
     """True se o arquivo é gitignored (logo nunca existe no checkout do CI)."""
     try:
+        # O .gitignore de um repo PAI não vale aqui: o CI faz checkout só deste repo.
+        topo = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                              capture_output=True, text=True, timeout=10).stdout.strip()
+        if not topo or Path(topo).resolve() != root.resolve():
+            return False
         r = subprocess.run(
             ["git", "-C", str(root), "check-ignore", "-q", relpath],
             capture_output=True, timeout=10,
@@ -343,6 +371,47 @@ def _git_ignored(root: Path, relpath: str) -> bool:
         return r.returncode == 0
     except Exception:
         return False
+
+
+def load_site_publico(root: Path) -> List[str]:
+    """Pastas declaradas em site_publico no .setup-ci.json.
+
+    Valor malformado não relaxa nada: a regra continua bloqueando e o erro
+    aparece no CI. Só vale para docs/ e subpastas: é onde o site é publicado.
+    """
+    pf = root / PROFILE_FILE
+    if not pf.exists():
+        return []
+    try:
+        data = json.loads(pf.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    raw = data.get("site_publico") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        return []
+    pastas = []
+    for item in raw:
+        if not isinstance(item, str) or item.startswith("/") or "\\" in item:
+            continue
+        partes = [x for x in item.split("/") if x]
+        if not partes or partes[0] != "docs" or any(x in (".", "..") for x in partes):
+            continue
+        pastas.append("/".join(partes))
+    return pastas
+
+
+def _no_site_publico(rel: str, pastas: List[str]) -> bool:
+    return any(rel.startswith(p + "/") for p in pastas)
+
+
+def _match_liberado(check_id: str, trecho: str, no_site: bool) -> bool:
+    """True quando o trecho casado nao conta como violacao."""
+    if check_id == "no_hardcoded_secrets":
+        valor = SEGREDO_VALOR_RE.search(trecho)
+        return bool(valor and SEGREDO_EXEMPLO_RE.fullmatch(valor.group(1)))
+    if check_id == "no_internal_infra_leak" and no_site:
+        return bool(SUPABASE_REF_RE.fullmatch(trecho))
+    return False
 
 
 # Arquivos exigidos só em setup de ENSINO (zx-control-setupN); produto de
@@ -354,6 +423,7 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
     failures: List[Dict[str, Any]] = []
     perfil = load_profile(root)
     nicho = perfil == NICHO_DOD_PROFILE
+    site_publico = load_site_publico(root)
 
     # 1) AST 3.9 em todos os .py
     for py in _iter_files(root, ["*.py"]):
@@ -386,15 +456,19 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
             })
 
     # 3) .env nunca commitado no histórico
+    historico_err = ""
     try:
-        out = subprocess.run(
-            ["git", "-C", str(root), "log", "--all", "--diff-filter=A",
-             "--name-only", "--", "*.env", "*credentials*", "*secrets*"],
+        res = subprocess.run(
+            ["git", "-C", str(root), "log", "--all", "--diff-filter=A", "--format=",
+             "--name-only", "--", "*.env", ".env.*", "*/.env.*", "*credentials*", "*secrets*"],
             capture_output=True, text=True, timeout=30,
-        ).stdout.strip()
+        )
+        out = res.stdout.strip()
+        if res.returncode != 0:
+            historico_err = (res.stderr.strip().splitlines() or ["git log falhou"])[-1]
         if out:
             for fname in out.splitlines():
-                if fname.strip().endswith((".example", ".template")):
+                if fname.strip().endswith((".example", ".template", ".sample")):
                     continue
                 if not fname.strip():
                     continue
@@ -403,8 +477,15 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
                     "severity": "block", "snippet": "arquivo sensível no git history",
                     "fix": "Remova do histórico (BFG / git filter-repo) e adicione ao .gitignore.",
                 })
-    except Exception:
-        pass  # sem git (ex.: zip baixado) — pula este check
+    except Exception as exc:
+        historico_err = str(exc)
+    # Sem .git (zip baixado) o check não se aplica. Com .git, não verificar não é passar.
+    if historico_err and (root / ".git").exists():
+        failures.append({
+            "file": ".git", "line": 0, "check": "env_no_historico",
+            "severity": "block", "snippet": f"não foi possível verificar o histórico: {historico_err}"[:200],
+            "fix": "Rode o validador num clone git íntegro, com permissão de leitura no repositório.",
+        })
 
     # 4) greps mecânicos
     for chk in GREP_CHECKS:
@@ -412,6 +493,7 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
         pattern = re.compile(chk["pattern"], flags)
         bases = [root / p for p in chk.get("paths", ["."])]
         excludes = chk.get("exclude_lines_with", [])
+        antes_do_match = chk.get("ignora_se_antes_do_match")
         for base in bases:
             if not base.exists():
                 continue
@@ -420,10 +502,22 @@ def collect_failures(root: Path) -> List[Dict[str, Any]]:
                     lines = f.read_text(encoding="utf-8", errors="ignore").splitlines()
                 except Exception:
                     continue
+                no_site = _no_site_publico(
+                    f.relative_to(root).as_posix(), site_publico)
+                if no_site and chk["id"] == "no_fetch_in_docs":
+                    continue
                 for i, line in enumerate(lines, 1):
+                    # Em md, html, json e yml o "*" é bullet e "//" é texto: não existe comentário a pular.
+                    comentario = (COMENTARIO_PY_RE if f.suffix == ".py"
+                                  else COMENTARIO_JS_RE if f.suffix in EXTENSOES_JS else None)
+                    if chk.get("skip_comment_lines") and comentario and comentario.match(line):
+                        continue
                     if any(ex in line for ex in excludes):
                         continue
-                    if pattern.search(line):
+                    alvo = CRASE_RE.sub("", line) if chk.get("strip_inline_code") else line
+                    if any(not _match_liberado(chk["id"], m.group(0), no_site)
+                           and not (antes_do_match and re.search(antes_do_match, STRING_RE.sub('""', alvo[:m.start()])))
+                           for m in pattern.finditer(alvo)):
                         failures.append({
                             "file": str(f.relative_to(root)),
                             "line": i,
